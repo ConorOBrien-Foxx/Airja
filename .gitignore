@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/airja
+airja.so
+airja.dylib
+airja.dll
+airja.a
+airja.lib
+airja-test-*
+*.exe
+*.o
+*.obj
+*.lst

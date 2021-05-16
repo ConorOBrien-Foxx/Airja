@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"Conor O'Brien"
+	],
+	"copyright": "Copyright © 2021, Conor O'Brien",
+	"description": "A stack based language",
+	"license": "proprietary",
+	"name": "airja"
+}
