@@ -16,6 +16,12 @@ Atom parseNumber(string repr) {
     return v;
 }
 
+Atom parseString(string repr) {
+    import std.array : replace;
+    Atom v = repr[1..$-1].replace("\"\"", "\"");
+    return v;
+}
+
 alias StackCallable = void delegate(eval.Instance);
 
 Atom[string] inheritedMemory;
@@ -43,7 +49,7 @@ class Instance {
         }
         catch(NoCaseException e) {
             writeln("No matching case for `" ~ tok.raw ~ "`");
-            writeln("<" ~ e.args.map!(a => repr(a).toString()).join(", ") ~ ">");
+            writeln("    Arguments: " ~ e.args.map!(a => repr(a).toString()).join(", "));
         }
     }
     
@@ -57,6 +63,10 @@ class Instance {
         switch(tok.type) {
             case TokenType.NUMBER:
                 state.stack.push(parseNumber(tok.raw));
+                break;
+            
+            case TokenType.STRING:
+                state.stack.push(parseString(tok.raw));
                 break;
             
             case TokenType.QUOTE_START:
@@ -149,5 +159,5 @@ void execute(string s) {
     Token[] tokens = tokenize.parse(s);
     auto instance = new Instance(tokens);
     instance.run;
-    writeln(instance.state.stack.data);
+    // writeln(instance.state.stack.data);
 }

@@ -27,9 +27,11 @@ class NilClass {
 
 static NilClass Nil;
 static NilClass NilNoCase;
+static NilClass NilNoReturn;
 static this() {
     Nil = new NilClass();
     NilNoCase = new NilClass();
+    NilNoReturn = new NilClass();
 }
 
 alias Atom = Algebraic!(string, BigInt, Quote, StackCallable, This[], NilClass);
@@ -39,6 +41,12 @@ class Stack {
     
     void push(Atom e) {
         data ~= e;
+    }
+    
+    Stack dup() {
+        Stack res;
+        res.data = data.dup;
+        return res;
     }
     
     // attempt cast

@@ -44,6 +44,7 @@ shared static this() {
     registerOp("/", "div");
     registerOp("!", "opbang");
     registerOp(",", "pair");
+    registerOp(":", "dup");
 }
 
 void insertSorted(alias less = "a < b", Range, Cell)(ref Range src, Cell toInsert) {
@@ -62,6 +63,10 @@ bool hasPrefix(Index)(string s, Index i, string sub) {
         if(s[i + j] != sub[j])  return false;
     }
     return true;
+}
+
+bool isIdentifier(T)(T c) {
+    return c.isAlphaNum || c == '_';
 }
 
 Token[] parse(string s) {
@@ -148,10 +153,30 @@ Token[] parse(string s, string[string] ops) {
         }
         else if(s[i].isAlpha) {
             build.type = TokenType.WORD;
-            while(i < s.length && s[i].isAlphaNum) {
+            while(i < s.length && s[i].isIdentifier) {
                 build.raw ~= s[i];
                 nextChar(i);
             }
+        }
+        else if(s[i] == '"') {
+            build.type = TokenType.STRING;
+            build.raw ~= '"';
+            nextChar(i);
+            while(i < s.length) {
+                build.raw ~= s[i];
+                nextChar(i);
+                if(s[i - 1] == '"') {
+                    if(i < s.length && s[i] == '"') {
+                        build.raw ~= s[i];
+                        nextChar(i);
+                    }
+                    else {
+                        break;
+                    }
+                }
+            }
+            // build.raw ~= s[i];
+            // nextChar(i);
         }
         else if(s[i] == '[') {
             build.type = TokenType.QUOTE_START;
