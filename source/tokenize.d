@@ -11,7 +11,9 @@ enum TokenType {
     QUOTE_END,          // ]
     SET_LOCAL,          // @name
     SET_GLOBAL,         // @!name
-    SET_FUNCTION,       // @:name    
+    SET_FUNCTION,       // @:name
+    VALUEOF,            // $name
+    COMMENT,            // ;asdf\n
     NUMBER,
     OP,
     WORD,
@@ -115,6 +117,18 @@ Token[] parse(string s, string[string] ops) {
         }
         return res;
     }
+    string readWord(Index)(ref Index i) {
+        string raw = "";
+        if(i < s.length && s[i].isIdentifierHead) {
+            raw ~= s[i];
+            nextChar(i);
+            while(i < s.length && s[i].isIdentifier) {
+                raw ~= s[i];
+                nextChar(i);
+            }
+        }
+        return raw;
+    }
     
     for(uint i = 0; i < s.length; ) {
         Token build = { row: row, col: col, raw: "", type: TokenType.UNKNOWN };
@@ -160,10 +174,7 @@ Token[] parse(string s, string[string] ops) {
         }
         else if(s[i].isIdentifierHead) {
             build.type = TokenType.WORD;
-            while(i < s.length && s[i].isIdentifier) {
-                build.raw ~= s[i];
-                nextChar(i);
-            }
+            build.raw ~= readWord(i);
         }
         else if(s[i] == '"') {
             build.type = TokenType.STRING;
@@ -211,15 +222,20 @@ Token[] parse(string s, string[string] ops) {
                 nextChar(i);
                 payloadStart++;
             }
-            if(i < s.length && s[i].isIdentifierHead) {
-                build.raw ~= s[i];
-                nextChar(i);
-                while(i < s.length && s[i].isIdentifier) {
-                    build.raw ~= s[i];
-                    nextChar(i);
-                }
-            }
+            build.raw ~= readWord(i);
             build.payload = build.raw[payloadStart..$];
+        }
+        else if(s[i] == ';') {
+            build.type = TokenType.COMMENT;
+            build.raw ~= readUntil(i, [ '\n' ]);
+        }
+        else if(s[i] == '$') {
+            uint payloadStart = 1;
+            build.type = TokenType.VALUEOF;
+            build.raw ~= s[i];
+            nextChar(i);
+            build.raw ~= readWord(i);
+            build.payload = build.raw[1..$];
         }
         else {
             string foundOp = "";
@@ -229,7 +245,6 @@ Token[] parse(string s, string[string] ops) {
                     foundOp = op;
                 }
             }
-            
             if(foundOp.length != 0) {
                 build.type = TokenType.OP;
                 build.raw ~= foundOp;

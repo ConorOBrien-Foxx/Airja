@@ -1,1 +1,6 @@
-4 [ 3 debug * ] call out
+$add @:old_add ; iasdhf uiasndf iajndf lia sjdfp9asjdfia
+
+[ * ] @:add
+debug
+3 4 debug + out
+3 4 old_add out

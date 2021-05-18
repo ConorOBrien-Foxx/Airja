@@ -104,6 +104,19 @@ class Instance {
         }
     }
     
+    bool call(Token tok, Atom val) {
+        if(val.convertsTo!StackCallable) {
+            call(tok, *val.peek!StackCallable);
+        }
+        else if(val.convertsTo!Quote) {
+            call(*val.peek!Quote);
+        }
+        else {
+            return false;
+        }
+        return true;
+    }
+    
     void handleInstruction(Token tok) {
         if(quoteDepth > 0 && !tok.isQuoteDelimiter) {
             if(tok.type == TokenType.QUOTE_SEP && !hasQuoteSep) {
@@ -146,13 +159,8 @@ class Instance {
             case TokenType.WORD:
                 try {
                     auto val = getVar(tok.raw);
-                    if(val.convertsTo!StackCallable) {
-                        call(tok, *val.peek!StackCallable);
-                    }
-                    else if(val.convertsTo!Quote) {
-                        call(*val.peek!Quote);
-                    }
-                    else {
+                    auto callSuccess = call(tok, val);
+                    if(!callSuccess) {
                         state.stack.push(val);
                     }
                 } catch(MissingKeyException e) {
@@ -163,7 +171,8 @@ class Instance {
             case TokenType.OP:
                 string name = tok.payload;
                 auto res = getVar(name);
-                call(tok, *res.peek!StackCallable);
+                // call(tok, *res.peek!StackCallable);
+                call(tok, res);
                 break;
             
             case TokenType.SET_LOCAL:
@@ -172,6 +181,13 @@ class Instance {
             
             case TokenType.SET_FUNCTION:
                 setGlobalVar(tok.payload, popTop());
+                break;
+            
+            case TokenType.VALUEOF:
+                push(getVar(tok.payload));
+                break;
+            
+            case TokenType.COMMENT:
                 break;
             
             case TokenType.WHITESPACE, TokenType.QUOTE_SEP:
