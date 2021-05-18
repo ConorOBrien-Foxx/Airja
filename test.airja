@@ -1,8 +1,3 @@
-[n|1[drop n:1-fact*]n:/ncall] @:fact
-
-10 iota
-debug
-
-: $fact map
-\ $bang map
-debug
+3 4 ≠ out
+3 3 = out
+[3] [3] = out

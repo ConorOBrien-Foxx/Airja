@@ -27,12 +27,12 @@ bool isQuoteDelimiter(TokenType t) {
 }
 struct Token {
     TokenType type;
-    string raw;
+    dstring raw;
     uint row;
     uint col;
-    string payload;
+    dstring payload;
     
-    static none() {
+    static Token none() {
         return Token(TokenType.NONE,"",0,0,"");
     }
 }
@@ -40,11 +40,11 @@ bool isQuoteDelimiter(Token tok) {
     return tok.type.isQuoteDelimiter;
 }
 
-string[string] sourceOps;
-void registerOp(ref string[string] src, string op, string name) {
+dstring[dstring] sourceOps;
+void registerOp(ref dstring[dstring] src, dstring op, dstring name) {
     src[op] = name;
 }
-void registerOp(string op, string name) {
+void registerOp(dstring op, dstring name) {
     registerOp(sourceOps, op, name);
 }
 
@@ -58,6 +58,8 @@ shared static this() {
     registerOp(":",  "dup");
     registerOp("\\", "swap");
     registerOp("~",  "drop");
+    registerOp("=",  "eq");
+    registerOp("≠",  "neq");
 }
 
 void insertSorted(alias less = "a < b", Range, Cell)(ref Range src, Cell toInsert) {
@@ -70,7 +72,7 @@ void insertSorted(alias less = "a < b", Range, Cell)(ref Range src, Cell toInser
     }
 }
 
-bool hasPrefix(Index)(string s, Index i, string sub) {
+bool hasPrefix(String, Index)(String s, Index i, String sub) {
     for(uint j = 0; j < sub.length; j++) {
         if(i + j >= s.length)   return false;
         if(s[i + j] != sub[j])  return false;
@@ -89,7 +91,12 @@ Token[] parse(string s) {
     return parse(s, sourceOps.dup);
 }
 
-Token[] parse(string s, string[string] ops) {
+Token[] parse(string s, dstring[dstring] ops) {
+    import std.conv : to;
+    return parse(to!dstring(s), ops);
+}
+
+Token[] parse(dstring s, dstring[dstring] ops) {
     import std.stdio;
     
     Token[] res;
@@ -114,8 +121,8 @@ Token[] parse(string s, string[string] ops) {
         }
     }
     
-    string readUntil(Index, T)(ref Index i, T c) {
-        string res = "";
+    dstring readUntil(Index, T)(ref Index i, T c) {
+        dstring res = "";
         // writefln("C: %u '%c' %u", i, s[i], c.find(s[i]).length);
         while(i < s.length && c.find(s[i]).length == 0) {
             // writefln("Parsing %u", i);
@@ -124,8 +131,8 @@ Token[] parse(string s, string[string] ops) {
         }
         return res;
     }
-    string readWord(Index)(ref Index i) {
-        string raw = "";
+    dstring readWord(Index)(ref Index i) {
+        dstring raw = "";
         if(i < s.length && s[i].isIdentifierHead) {
             raw ~= s[i];
             nextChar(i);
@@ -141,13 +148,13 @@ Token[] parse(string s, string[string] ops) {
         Token build = { row: row, col: col, raw: "", type: TokenType.UNKNOWN };
         
         // handle preprocess directive
-        if(build.col == 1 && s.hasPrefix(i, "@@")) {
+        if(build.col == 1 && s.hasPrefix(i, "@@"d)) {
             nextChar(i, 2);
             if(s.hasPrefix(i, "op")) {
                 nextChar(i, 2);
                 if(s[i] == ' ') nextChar(i);
-                string newOp = readUntil(i, [' ', '\n']).strip;
-                string name = readUntil(i, ['\n']).strip;
+                auto newOp = readUntil(i, [' ', '\n']).strip;
+                auto name = readUntil(i, ['\n']).strip;
                 registerOp(ops, newOp, name);
                 // insertSorted!"a.length > b.length"(ops, newOp.strip);
             }
@@ -250,7 +257,7 @@ Token[] parse(string s, string[string] ops) {
             build.payload = build.raw[1..$];
         }
         else {
-            string foundOp = "";
+            dstring foundOp = "";
             foreach(op, name; ops) {
                 // writeln(name, op);
                 if(s.hasPrefix(i, op) && op.length > foundOp.length) {

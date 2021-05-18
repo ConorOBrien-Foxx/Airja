@@ -10,14 +10,14 @@ import fn;
 import quote;
 
 //TODO: bigfloat
-Atom parseNumber(string repr) {
+Atom parseNumber(dstring repr) {
     // TODO: other types
     Atom v = BigInt(repr);
     // Variant v = to!int(repr);
     return v;
 }
 
-Atom parseString(string repr) {
+Atom parseString(dstring repr) {
     import std.array : replace;
     Atom v = repr[1..$-1].replace("\"\"", "\"");
     return v;
@@ -26,7 +26,7 @@ Atom parseString(string repr) {
 alias StackCallable = void delegate(eval.Instance);
 struct TaggedStackCallable {
     Token token;
-    string name;
+    dstring name;
     StackCallable stc;
     
     this(Token token, StackCallable stc) {
@@ -35,7 +35,7 @@ struct TaggedStackCallable {
         this.stc = stc;
     }
     
-    string toString() {
+    dstring toString() {
         return "$" ~ this.name;
     }
 }
@@ -45,7 +45,7 @@ bool isCallable(Atom e) {
     return e.convertsTo!StackCallable || e.convertsTo!TaggedStackCallable || e.convertsTo!Quote;
 }
 
-Atom[string] inheritedMemory;
+Atom[dstring] inheritedMemory;
 class Instance {
     State[] states;
     Token[] tokens;
@@ -85,13 +85,13 @@ class Instance {
         }
         states.length--;
     }
-    void setLocalVar(string name, Atom val) {
+    void setLocalVar(dstring name, Atom val) {
         state.setVar(name, val);
     }
-    void setGlobalVar(string name, Atom val) {
+    void setGlobalVar(dstring name, Atom val) {
         states[0].setVar(name, val);
     }
-    auto getVar(string name) {
+    auto getVar(dstring name) {
         //TODO: maybe maintain a hash of identifiers?
         foreach_reverse(s; states) {
             if(s.hasVar(name)) {
@@ -118,7 +118,7 @@ class Instance {
         import std.range : lockstep;
         if(q.args.length) {
             Atom[] args;
-            string[] arg_names;
+            dstring[] arg_names;
             foreach(tok; q.args) {
                 if(tok.type == TokenType.WORD) {
                     args.insertInPlace(0, popTop());
@@ -220,7 +220,7 @@ class Instance {
                 break;
             
             case TokenType.OP:
-                string name = tok.payload;
+                dstring name = tok.payload;
                 auto res = getVar(name);
                 // call(tok, *res.peek!StackCallable);
                 call(tok, res);

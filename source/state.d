@@ -35,11 +35,13 @@ static this() {
 }
 
 alias Atom = Algebraic!(
-    string,
+    dstring,
+    bool,
     BigInt,
     Quote,
     StackCallable, TaggedStackCallable,
-    This[],
+    This[], // array
+    This[This], // associative array
     NilClass
 );
 
@@ -109,12 +111,12 @@ class MissingKeyException : Exception {
 import std.stdio;
 class State {
     Stack stack;
-    Atom[string] vars;
+    Atom[dstring] vars;
     
     this() {
         stack = new Stack();
     }
-    this(Atom[string] vars) {
+    this(Atom[dstring] vars) {
         this();
         this.vars = vars;
     }
@@ -127,24 +129,25 @@ class State {
         // writeln("closing");
     }
     
-    void setVar(string s, Atom e) {
+    void setVar(dstring s, Atom e) {
         vars[s] = e;
     }
     
-    void setVar(T)(string s, T e)
+    void setVar(T)(dstring s, T e)
     if(!is(Atom == T)) {
         Atom v = e;
         setVar(s, v);
     }
-    Atom getVar(string s) {
+    Atom getVar(dstring s) {
+        import std.conv : to;
         auto has = s in vars;
         if(has is null) {
-            throw new MissingKeyException("No such key " ~ s);
+            throw new MissingKeyException("No such key " ~ to!string(s));
         }
         return *has;
         // return vars[s];
     }
-    bool hasVar(string s) {
+    bool hasVar(dstring s) {
         return !!(s in vars);
     }
 }

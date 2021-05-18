@@ -71,10 +71,25 @@ auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
     return res;
 }
 
+// Atom boolToAtom(bool b) {
+    // Atom res = b ? BigInt("1") : BigInt("0");
+    // return res;
+// }
+
+Atom equal(Atom a, Atom b) {
+    Atom v = a == b;
+    return v;
+}
+Atom notEqual(Atom a, Atom b) {
+    Atom v = a != b;
+    return v;
+}
+
+
 BigInt add(BigInt a, BigInt b) {
     return a + b;
 }
-string add(string a, string b) {
+dstring add(dstring a, dstring b) {
     return a ~ b;
 }
 // Quote add(Quote a, Quote b) {
@@ -83,7 +98,7 @@ string add(string a, string b) {
 Atom[] add(Atom[] a, Atom[] b) {
     return a ~ b;
 }
-// static foreach(type; ["BigInt", "string", "Quote", "Atom[]"]) {
+// static foreach(type; ["BigInt", "dstring", "Quote", "Atom[]"]) {
     // mixin("Atom[] add(Atom[] a, " ~ type ~ " b) { return a ~ b; } ");
 // }
 // Atom[] add(Atom[] a, BigInt b) {
@@ -105,15 +120,15 @@ Atom sub(Atom a, Atom b) {
 BigInt mul(BigInt a, BigInt b) {
     return a * b;
 }
-string mul(string a, BigInt b) {
+dstring mul(dstring a, BigInt b) {
     import std.range : repeat;
-    string res;
+    dstring res;
     for(BigInt i = 0; i < b; i++) {
         res ~= a;
     }
     return res;
 }
-string mul(BigInt b, string a) {
+dstring mul(BigInt b, dstring a) {
     return mul(a, b);
 }
 Atom mul(Atom a, Atom b) {
@@ -138,24 +153,28 @@ Atom div(Atom a, Atom b) {
 }
 
 import std.conv : to;
-string repr(BigInt e) {
-    return to!string(e);
+dstring repr(BigInt e) {
+    return to!dstring(e);
 }
-string repr(string e) {
+dstring repr(dstring e) {
     return '"' ~ e ~ '"';
 }
-string repr(Atom[] arr) {
-    return "(" ~ arr.map!repr.map!(to!string).join(" ") ~ ")";
+dstring repr(Atom[] arr) {
+    return "(" ~ arr.map!repr.map!(to!dstring).join(" ") ~ ")";
 }
-string repr(NilClass nil) {
-    return nil.toString();
+dstring repr(NilClass nil) {
+    return to!dstring(nil.toString());
 }
-string repr(Quote q) {
+dstring repr(Quote q) {
     return "[" ~ q.tokens.map!"a.raw".join ~ "]";
 }
-string repr(TaggedStackCallable tsc) {
+dstring repr(TaggedStackCallable tsc) {
     return tsc.toString();
 }
+dstring repr(bool b) {
+    return b ? "1b" : "0b";
+}
+
 Atom repr(Atom e) {
     return visitOverload!"repr"(e);
 }
@@ -231,10 +250,10 @@ void pushStackCopy(Instance inst) {
     inst.push(inst.state.stack.data.dup);
 }
 
-string convertToString(string e) { return e; }
-string convertToString(BigInt e) { return to!string(e); }
-string convertToString(Atom[] e) { return e.map!(p => to!string(convertToString(p))).join(""); }
-string convertToString(Quote e) { return e.tokens.map!"a.raw".join(""); }
+dstring convertToString(dstring e) { return e; }
+dstring convertToString(BigInt e) { return to!dstring(e); }
+dstring convertToString(Atom[] e) { return e.map!(p => to!dstring(convertToString(p))).join(""); }
+dstring convertToString(Quote e) { return e.tokens.map!"a.raw".join(""); }
 Atom convertToString(Atom e) {
     return visitOverload!"convertToString"(e);
 }
@@ -347,7 +366,7 @@ auto stackNilad(alias nilad)() {
 }
 
 void initialize(Instance inst) {
-    void register(Fn)(string key, Fn fn) {
+    void register(Fn)(dstring key, Fn fn) {
         inst.state.setVar(key, fn);
     }
     //op aliases
@@ -359,6 +378,8 @@ void initialize(Instance inst) {
     register("dup", stackNilad!duplicateTop);
     register("swap", stackNilad!swapTopTwo);
     register("drop", stackNilad!stackPop);
+    register("eq", stackBinaryFun!equal);
+    register("neq", stackBinaryFun!notEqual);
     //functions
     register("map", stackNilad!quoteMapOnStack);
     register("imap", stackNilad!(quoteMapOnStack!true));
@@ -376,6 +397,6 @@ void initialize(Instance inst) {
     // register("to_a", stackUnaryFun!convertToArray);
     // register("to_n", stackUnaryFun!convertToNumber);
     //misc info
-    register("version", "1.0");
+    register("version", "0.0.1"d);
     register("nil", Nil);
 }

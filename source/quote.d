@@ -20,9 +20,10 @@ class Quote {
     }
     
     override string toString() {
+        import std.conv : to;
         return "[" ~
-            args.map!"a.raw".join ~
-            tokens.map!"a.raw".join ~
+            to!string(args.map!"a.raw".join) ~
+            to!string(tokens.map!"a.raw".join) ~
             "]";
     }
 }
