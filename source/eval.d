@@ -45,6 +45,7 @@ class Instance {
     }
     void openScope() {
         states ~= new State();
+        state.stack = states[$ - 2].stack;
     }
     void closeScope() {
         states[$ - 2].stack = state.stack;
@@ -81,20 +82,26 @@ class Instance {
     void call(Quote q) {
         import std.array : insertInPlace;
         import std.range : lockstep;
-        Atom[] args;
-        string[] arg_names;
-        foreach(tok; q.args) {
-            if(tok.type == TokenType.WORD) {
-                args.insertInPlace(0, popTop());
-                arg_names ~= tok.raw;
+        if(q.args.length) {
+            Atom[] args;
+            string[] arg_names;
+            foreach(tok; q.args) {
+                if(tok.type == TokenType.WORD) {
+                    args.insertInPlace(0, popTop());
+                    arg_names ~= tok.raw;
+                }
+            }
+            openScope();
+            foreach(name, value; lockstep(arg_names, args)) {
+                setLocalVar(name, value);
             }
         }
-        openScope();
-        foreach(name, value; lockstep(arg_names, args)) {
-            setLocalVar(name, value);
-        }
+        
         handleTokens(q.tokens);
-        closeScope();
+        
+        if(q.args.length) {
+            closeScope();
+        }
     }
     
     void handleInstruction(Token tok) {
