@@ -1,6 +1,8 @@
-$add @:old_add ; iasdhf uiasndf iajndf lia sjdfp9asjdfia
+[n|1[drop n:1-fact*]n:/ncall] @:fact
 
-[ * ] @:add
+10 iota
 debug
-3 4 debug + out
-3 4 old_add out
+
+: $fact map
+\ $bang map
+debug

@@ -19,7 +19,8 @@ enum TokenType {
     WORD,
     STRING,
     WHITESPACE,
-    UNKNOWN
+    UNKNOWN,
+    NONE,//used internally
 }
 bool isQuoteDelimiter(TokenType t) {
     return t == TokenType.QUOTE_START || t == TokenType.QUOTE_END;
@@ -30,6 +31,10 @@ struct Token {
     uint row;
     uint col;
     string payload;
+    
+    static none() {
+        return Token(TokenType.NONE,"",0,0,"");
+    }
 }
 bool isQuoteDelimiter(Token tok) {
     return tok.type.isQuoteDelimiter;
@@ -44,13 +49,15 @@ void registerOp(string op, string name) {
 }
 
 shared static this() {
-    registerOp("+", "add");
-    registerOp("-", "sub");
-    registerOp("*", "mul");
-    registerOp("/", "div");
-    registerOp("!", "opbang");
-    registerOp(",", "pair");
-    registerOp(":", "dup");
+    registerOp("+",  "add");
+    registerOp("-",  "sub");
+    registerOp("*",  "mul");
+    registerOp("/",  "div");
+    registerOp("!",  "bang");
+    registerOp(",",  "pair");
+    registerOp(":",  "dup");
+    registerOp("\\", "swap");
+    registerOp("~",  "drop");
 }
 
 void insertSorted(alias less = "a < b", Range, Cell)(ref Range src, Cell toInsert) {
@@ -205,6 +212,11 @@ Token[] parse(string s, string[string] ops) {
             build.type = TokenType.QUOTE_SEP;
             build.raw ~= s[i];
             nextChar(i);
+            if(i < s.length && s[i] == '.') {// clear stack before execution
+                build.raw ~= s[i];
+                build.payload ~= s[i];
+                nextChar(i);
+            }
         }
         else if(s[i] == ']') {
             build.type = TokenType.QUOTE_END;

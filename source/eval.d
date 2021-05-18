@@ -24,6 +24,26 @@ Atom parseString(string repr) {
 }
 
 alias StackCallable = void delegate(eval.Instance);
+struct TaggedStackCallable {
+    Token token;
+    string name;
+    StackCallable stc;
+    
+    this(Token token, StackCallable stc) {
+        this.token = token;
+        this.name = token.payload;
+        this.stc = stc;
+    }
+    
+    string toString() {
+        return "$" ~ this.name;
+    }
+}
+
+
+bool isCallable(Atom e) {
+    return e.convertsTo!StackCallable || e.convertsTo!TaggedStackCallable || e.convertsTo!Quote;
+}
 
 Atom[string] inheritedMemory;
 class Instance {
@@ -45,10 +65,24 @@ class Instance {
     }
     void openScope() {
         states ~= new State();
-        state.stack = states[$ - 2].stack;
+        state.stack = states[$ - 2].stack.dup;
     }
-    void closeScope() {
-        states[$ - 2].stack = state.stack;
+    void closeScope(bool append = false) {
+        if(append) {
+            // writeln("Before:");
+            // writeln(states[$-2].stack.data);
+            // foreach(i, st; states) {
+                // writefln("%u: %s", i, st.stack.data);
+            // }
+            states[$ - 2].stack ~= state.stack;
+            // writeln("After:");
+            // foreach(i, st; states) {
+                // writefln("%u: %s", i, st.stack.data);
+            // }
+        }
+        else {
+            states[$ - 2].stack = state.stack;
+        }
         states.length--;
     }
     void setLocalVar(string name, Atom val) {
@@ -100,8 +134,12 @@ class Instance {
         handleTokens(q.tokens);
         
         if(q.args.length) {
-            closeScope();
+            closeScope(q.clearStack);
         }
+    }
+    
+    void call(TaggedStackCallable tsc) {
+        call(tsc.token, tsc.stc);
     }
     
     bool call(Token tok, Atom val) {
@@ -111,10 +149,17 @@ class Instance {
         else if(val.convertsTo!Quote) {
             call(*val.peek!Quote);
         }
+        else if(val.convertsTo!TaggedStackCallable) {
+            call(*val.peek!TaggedStackCallable);
+        }
         else {
             return false;
         }
         return true;
+    }
+    
+    bool call(Atom val) {
+        return call(Token.none(), val);
     }
     
     void handleInstruction(Token tok) {
@@ -143,6 +188,9 @@ class Instance {
                     hasQuoteSep = false;
                     quoteSepIndex = 0;
                 }
+                else {
+                    buildQuote ~= tok;
+                }
                 quoteDepth++;
                 break;
                 
@@ -153,6 +201,9 @@ class Instance {
                         buildQuote[0..quoteSepIndex],
                         buildQuote[quoteSepIndex..$]
                     ));
+                }
+                else {
+                    buildQuote ~= tok;
                 }
                 break;
             
@@ -184,13 +235,23 @@ class Instance {
                 break;
             
             case TokenType.VALUEOF:
-                push(getVar(tok.payload));
+                auto res = getVar(tok.payload);
+                if(res.convertsTo!StackCallable) {
+                    res = TaggedStackCallable(tok, *res.peek!StackCallable);
+                }
+                push(res);
                 break;
             
             case TokenType.COMMENT:
                 break;
             
-            case TokenType.WHITESPACE, TokenType.QUOTE_SEP:
+            case TokenType.QUOTE_SEP:
+                if(tok.payload) {
+                    state.stack.clear;
+                }
+                break;
+            
+            case TokenType.WHITESPACE:
                 //pass
                 break;
             

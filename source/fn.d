@@ -32,13 +32,14 @@ auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
             foreach(i, p; params) {
                 auto v = variants[i].peek!p;
                 if(v is null) {
-                    if(is(VariantAtomType == p)) {
+                    /*if(is(VariantAtomType == p)) {
                         // pass
                     }
                     else {
+                    */
                         valid = false;
                         break;
-                    }
+                    //}
                 }
                 else {
                     atLeastOnceSpecific = true;
@@ -129,8 +130,11 @@ Atom factorial(Atom a) {
     return visitOverload!"factorial"(a);
 }
 
-Atom div(Atom a, Atom b) {
+BigInt div(BigInt a, BigInt b) {
     return a / b;
+}
+Atom div(Atom a, Atom b) {
+    return visitOverload!"div"(a, b);
 }
 
 import std.conv : to;
@@ -148,6 +152,9 @@ string repr(NilClass nil) {
 }
 string repr(Quote q) {
     return "[" ~ q.tokens.map!"a.raw".join ~ "]";
+}
+string repr(TaggedStackCallable tsc) {
+    return tsc.toString();
 }
 Atom repr(Atom e) {
     return visitOverload!"repr"(e);
@@ -253,10 +260,10 @@ Atom iotaUnary(Atom e) {
 
 void quoteMapOnStack(alias withIndex = false)(Instance inst) {
     auto functor = inst.popTop();
-    Quote* qRef = functor.peek!Quote;
+    // Quote* qRef = functor.peek!Quote;
     auto arr = inst.popTop();
     Atom[]* src = arr.peek!(Atom[]);
-    if(qRef !is null && src !is null) {
+    if(functor.isCallable && src !is null) {
         Atom[] res = (*src).dup;
         auto tempStack = inst.state.stack;
         foreach(i, ref e; res) {
@@ -265,7 +272,8 @@ void quoteMapOnStack(alias withIndex = false)(Instance inst) {
                 inst.push(BigInt(i));
             }
             inst.push(e);
-            inst.handleTokens(qRef.tokens);
+            // inst.handleTokens(qRef.tokens);
+            inst.call(functor);
             e = inst.popTop();
         }
         inst.state.stack = tempStack;
@@ -276,6 +284,10 @@ void quoteMapOnStack(alias withIndex = false)(Instance inst) {
         inst.push(functor);
         throw new NoCaseException(arr, functor);
     }
+}
+
+void stackPop(Instance inst) {
+    inst.popTop();
 }
 
 // helper / bootstrap
@@ -346,6 +358,7 @@ void initialize(Instance inst) {
     register("pair", stackBinaryFun!pair);
     register("dup", stackNilad!duplicateTop);
     register("swap", stackNilad!swapTopTwo);
+    register("drop", stackNilad!stackPop);
     //functions
     register("map", stackNilad!quoteMapOnStack);
     register("imap", stackNilad!(quoteMapOnStack!true));
@@ -354,7 +367,7 @@ void initialize(Instance inst) {
     register("debug", stackNilad!debugStack);
     register("call", stackNilad!callTopAsFunction);
     register("ncall", stackNilad!callTopAsFunctionNTimes);
-    register("opbang", stackNilad!opbang);
+    register("bang", stackNilad!opbang);
     register("repr", stackUnaryFun!repr);
     register("stack", stackNilad!pushStackCopy);
     register("iota", stackUnaryFun!iotaUnary);

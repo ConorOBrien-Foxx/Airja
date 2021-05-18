@@ -2,7 +2,7 @@ import std.variant;
 import std.bigint;
 
 import quote : Quote;
-import eval : StackCallable;
+import eval : StackCallable, TaggedStackCallable;
 
 class StackEmptyException : Exception {
     this(string msg = "Popping from an empty stack", string file = __FILE__, size_t line = __LINE__) {
@@ -34,10 +34,23 @@ static this() {
     NilNoReturn = new NilClass();
 }
 
-alias Atom = Algebraic!(string, BigInt, Quote, StackCallable, This[], NilClass);
+alias Atom = Algebraic!(
+    string,
+    BigInt,
+    Quote,
+    StackCallable, TaggedStackCallable,
+    This[],
+    NilClass
+);
 
 class Stack {
     Atom[] data;
+    
+    this() {
+    }
+    this(Atom[] d) {
+        data ~= d;
+    }
     
     void push(Atom e) {
         data ~= e;
@@ -51,6 +64,15 @@ class Stack {
     
     void clear() {
         data.length = 0;
+    }
+    
+    Stack opBinary(string op)(Stack rhs)
+    if(op == "~") {
+        return mixin("new Stack(data " ~ op ~ " rhs.data)");
+    }
+    void opOpAssign(string op)(Stack rhs)
+    if(op == "~") {
+        data ~= rhs.data;
     }
     
     // attempt cast
