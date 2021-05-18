@@ -44,9 +44,13 @@ class Stack {
     }
     
     Stack dup() {
-        Stack res;
+        Stack res = new Stack();
         res.data = data.dup;
         return res;
+    }
+    
+    void clear() {
+        data.length = 0;
     }
     
     // attempt cast
@@ -74,6 +78,12 @@ class Stack {
     }
 }
 
+class MissingKeyException : Exception {
+    this(string msg = "No such key", string file = __FILE__, size_t line = __LINE__) {
+        super(msg, file, line);
+    }
+}
+
 import std.stdio;
 class State {
     Stack stack;
@@ -86,6 +96,14 @@ class State {
         this();
         this.vars = vars;
     }
+    this(State other) {
+        this();
+        // writeln("Setting stack");
+        this.stack = other.stack.dup;
+        // writeln("Setting vars");
+        this.vars = other.vars.dup;//TODO: check if deep dup
+        // writeln("closing");
+    }
     
     void setVar(string s, Atom e) {
         vars[s] = e;
@@ -97,7 +115,12 @@ class State {
         setVar(s, v);
     }
     Atom getVar(string s) {
-        return vars[s];
+        auto has = s in vars;
+        if(has is null) {
+            throw new MissingKeyException("No such key " ~ s);
+        }
+        return *has;
+        // return vars[s];
     }
     bool hasVar(string s) {
         return !!(s in vars);

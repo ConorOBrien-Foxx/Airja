@@ -1,13 +1,21 @@
 import std.stdio;
 import std.file;// : readText;
+import std.getopt;
 // import std.utf;
 
 // import tokenize;
 // import state;
+
+
+
 import eval;
 
 void main(string[] args) {
-    string filename = args.length < 2 ? "test.airja" : args[1];
+    string filename = "test.airja";
+    auto info = getopt(args,
+        "file", &filename
+    );
+    // string filename = args.length < 2 ? "test.airja" : args[1];
     string content = readText(filename);
     eval.execute(content);
     // Token[] tokens = tokenize.parse(content);

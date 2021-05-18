@@ -9,6 +9,7 @@ import state;
 import fn;
 import quote;
 
+//TODO: bigfloat
 Atom parseNumber(string repr) {
     // TODO: other types
     Atom v = BigInt(repr);
@@ -26,20 +27,44 @@ alias StackCallable = void delegate(eval.Instance);
 
 Atom[string] inheritedMemory;
 class Instance {
-    State state;
+    State[] states;
     Token[] tokens;
-    // uint index = 0;
+    
     Token[] buildQuote;
+    ulong quoteSepIndex = 0;
+    bool hasQuoteSep = false;
     uint quoteDepth = 0;
     
     this(Token[] tokens) {
         this.tokens = tokens;
-        state = new State(inheritedMemory.dup);
+        states ~= new State(inheritedMemory.dup);
     }
     
-    // bool isRunning() {
-        // return index < tokens.length;
-    // }
+    State state() {
+        return states[$-1];
+    }
+    void openScope() {
+        states ~= new State();
+    }
+    void closeScope() {
+        states[$ - 2].stack = state.stack;
+        states.length--;
+    }
+    void setLocalVar(string name, Atom val) {
+        state.setVar(name, val);
+    }
+    void setGlobalVar(string name, Atom val) {
+        states[0].setVar(name, val);
+    }
+    auto getVar(string name) {
+        //TODO: maybe maintain a hash of identifiers?
+        foreach_reverse(s; states) {
+            if(s.hasVar(name)) {
+                return s.getVar(name);
+            }
+        }
+        return state.getVar(name);
+    }
     
     void call(Token tok, StackCallable c) {
         import std.algorithm : map;
@@ -53,8 +78,30 @@ class Instance {
         }
     }
     
+    void call(Quote q) {
+        import std.array : insertInPlace;
+        import std.range : lockstep;
+        Atom[] args;
+        string[] arg_names;
+        foreach(tok; q.args) {
+            if(tok.type == TokenType.WORD) {
+                args.insertInPlace(0, popTop());
+                arg_names ~= tok.raw;
+            }
+        }
+        openScope();
+        foreach(name, value; lockstep(arg_names, args)) {
+            setLocalVar(name, value);
+        }
+        handleTokens(q.tokens);
+        closeScope();
+    }
+    
     void handleInstruction(Token tok) {
         if(quoteDepth > 0 && !tok.isQuoteDelimiter) {
+            if(tok.type == TokenType.QUOTE_SEP && !hasQuoteSep) {
+                quoteSepIndex = buildQuote.length;
+            }
             buildQuote ~= tok;
             return;
         }
@@ -70,48 +117,62 @@ class Instance {
                 break;
             
             case TokenType.QUOTE_START:
-                if(!quoteDepth) buildQuote = [];
+                if(!quoteDepth) {
+                    //init info
+                    buildQuote = [];
+                    hasQuoteSep = false;
+                    quoteSepIndex = 0;
+                }
                 quoteDepth++;
                 break;
                 
             case TokenType.QUOTE_END:
                 quoteDepth--;
                 if(quoteDepth == 0) {
-                    state.stack.push(new Quote(buildQuote));
+                    state.stack.push(new Quote(
+                        buildQuote[0..quoteSepIndex],
+                        buildQuote[quoteSepIndex..$]
+                    ));
                 }
                 break;
             
             case TokenType.WORD:
-                if(state.hasVar(tok.raw)) {
-                    auto val = state.getVar(tok.raw);
-                    if(val.convertsTo!(StackCallable)) {
-                        // val(this);
+                try {
+                    auto val = getVar(tok.raw);
+                    if(val.convertsTo!StackCallable) {
                         call(tok, *val.peek!StackCallable);
+                    }
+                    else if(val.convertsTo!Quote) {
+                        call(*val.peek!Quote);
                     }
                     else {
                         state.stack.push(val);
                     }
-                }
-                else {
-                    //TODO: error
-                    writefln("No such token: %s", tok);
+                } catch(MissingKeyException e) {
+                    writefln("[%u:%u] Undefined variable '%s'", tok.row, tok.col, tok.raw);
                 }
                 break;
             
             case TokenType.OP:
                 string name = tok.payload;
-                auto res = state.getVar(name);
-                // writeln(res.type);
-                // res(this);
+                auto res = getVar(name);
                 call(tok, *res.peek!StackCallable);
                 break;
             
-            case TokenType.WHITESPACE:
+            case TokenType.SET_LOCAL:
+                setLocalVar(tok.payload, popTop());
+                break;
+            
+            case TokenType.SET_FUNCTION:
+                setGlobalVar(tok.payload, popTop());
+                break;
+            
+            case TokenType.WHITESPACE, TokenType.QUOTE_SEP:
                 //pass
                 break;
             
             default:
-                writefln("Unhandled token type: %s", tok.type);
+                writefln("[%u:%u] Unhandled token type: %s", tok.row, tok.col, tok.type);
                 break;
         }
     }
@@ -122,16 +183,7 @@ class Instance {
         }
     }
     
-    // void step() {
-        // Token token = tokens[index];
-        // handleInstruction(token);
-        // index++;
-    // }
-    
     void run() {
-        // while(isRunning) {
-            // step();
-        // }
         handleTokens(tokens);
     }
     

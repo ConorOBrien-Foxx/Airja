@@ -6,8 +6,12 @@ import std.algorithm.searching : find;
 import std.array : insertInPlace;
 
 enum TokenType {
-    QUOTE_START,
-    QUOTE_END,
+    QUOTE_START,        // [
+    QUOTE_SEP,          // |
+    QUOTE_END,          // ]
+    SET_LOCAL,          // @name
+    SET_GLOBAL,         // @!name
+    SET_FUNCTION,       // @:name    
     NUMBER,
     OP,
     WORD,
@@ -65,6 +69,9 @@ bool hasPrefix(Index)(string s, Index i, string sub) {
     return true;
 }
 
+bool isIdentifierHead(T)(T c) {
+    return c.isAlpha;
+}
 bool isIdentifier(T)(T c) {
     return c.isAlphaNum || c == '_';
 }
@@ -151,7 +158,7 @@ Token[] parse(string s, string[string] ops) {
                 nextChar(i);
             }
         }
-        else if(s[i].isAlpha) {
+        else if(s[i].isIdentifierHead) {
             build.type = TokenType.WORD;
             while(i < s.length && s[i].isIdentifier) {
                 build.raw ~= s[i];
@@ -183,10 +190,36 @@ Token[] parse(string s, string[string] ops) {
             build.raw ~= s[i];
             nextChar(i);
         }
+        else if(s[i] == '|') {
+            build.type = TokenType.QUOTE_SEP;
+            build.raw ~= s[i];
+            nextChar(i);
+        }
         else if(s[i] == ']') {
             build.type = TokenType.QUOTE_END;
             build.raw ~= s[i];
             nextChar(i);
+        }
+        else if(s[i] == '@') {
+            uint payloadStart = 1;
+            build.type = TokenType.SET_LOCAL;
+            build.raw ~= s[i];
+            nextChar(i);
+            if(s[i] == ':') {
+                build.type = TokenType.SET_FUNCTION;
+                build.raw ~= s[i];
+                nextChar(i);
+                payloadStart++;
+            }
+            if(i < s.length && s[i].isIdentifierHead) {
+                build.raw ~= s[i];
+                nextChar(i);
+                while(i < s.length && s[i].isIdentifier) {
+                    build.raw ~= s[i];
+                    nextChar(i);
+                }
+            }
+            build.payload = build.raw[payloadStart..$];
         }
         else {
             string foundOp = "";

@@ -8,7 +8,8 @@ import std.algorithm : map;
 import std.array : join;
 import std.meta : Alias;
 
-import state : Atom, Nil, NilNoCase, NilNoReturn, NilClass;
+// import state : Stack, Atom, Nil, NilNoCase, NilNoReturn, NilClass;
+import state;
 import eval;
 import quote;
 
@@ -26,11 +27,21 @@ auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
             alias isVoid = Alias!(is(ReturnType!t == void));
             alias params = Parameters!t;
             bool valid = true;
+            bool atLeastOnceSpecific = false;
+            // writeln(typeid(params));
             foreach(i, p; params) {
                 auto v = variants[i].peek!p;
                 if(v is null) {
-                    valid = false;
-                    break;
+                    if(is(VariantAtomType == p)) {
+                        // pass
+                    }
+                    else {
+                        valid = false;
+                        break;
+                    }
+                }
+                else {
+                    atLeastOnceSpecific = true;
                 }
             }
             if(valid) {
@@ -40,6 +51,10 @@ auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
                     isVoid ? "": "res = ",
                     "t(",
                     params.length.iota.map!(
+                        // i => is(VariantAtomType == params[i])
+                            // ? text("variants[",i,"]")
+                            // :
+                            
                         i => text("*variants[",i,"].peek!(params[",i,"])")
                     ).join(", "),
                     ");"
@@ -61,6 +76,20 @@ BigInt add(BigInt a, BigInt b) {
 string add(string a, string b) {
     return a ~ b;
 }
+// Quote add(Quote a, Quote b) {
+    // return new Quote(a.tokens ~ b.tokens);
+// }
+Atom[] add(Atom[] a, Atom[] b) {
+    return a ~ b;
+}
+// static foreach(type; ["BigInt", "string", "Quote", "Atom[]"]) {
+    // mixin("Atom[] add(Atom[] a, " ~ type ~ " b) { return a ~ b; } ");
+// }
+// Atom[] add(Atom[] a, BigInt b) {
+    // return a ~ b;
+// }
+
+
 Atom add(Atom a, Atom b) {
     return visitOverload!"add"(a, b);
 }
@@ -145,7 +174,7 @@ void callTopAsFunction(Instance inst) {
     auto top = inst.popTop();
     Quote* qRef = top.peek!Quote;
     if(qRef !is null) {
-        inst.handleTokens(qRef.tokens);
+        inst.call(*qRef);
     }
     else {
         inst.push(top);
@@ -160,7 +189,7 @@ void callTopAsFunctionNTimes(Instance inst) {
     Quote* qRef = top.peek!Quote;
     if(biRef !is null && qRef !is null) {
         for(int i = 0; i < *biRef; i++) {
-            inst.handleTokens(qRef.tokens);
+            inst.call(*qRef);
         }
     }
     else {
@@ -208,6 +237,46 @@ Atom convertToString(Atom e) {
 // Atom convertToNumber(Atom e) {
     // return visitOverload!convertToNumber(e);
 // }
+
+Atom[] iotaUnary(BigInt e) {
+    Atom[] list;
+    for(BigInt i = 0; i < e; i++) {
+        Atom el = i;
+        list ~= el;
+    }
+    return list;
+}
+
+Atom iotaUnary(Atom e) {
+    return visitOverload!"iotaUnary"(e);
+}
+
+void quoteMapOnStack(alias withIndex = false)(Instance inst) {
+    auto functor = inst.popTop();
+    Quote* qRef = functor.peek!Quote;
+    auto arr = inst.popTop();
+    Atom[]* src = arr.peek!(Atom[]);
+    if(qRef !is null && src !is null) {
+        Atom[] res = (*src).dup;
+        auto tempStack = inst.state.stack;
+        foreach(i, ref e; res) {
+            inst.state.stack = new Stack();
+            static if(withIndex) {
+                inst.push(BigInt(i));
+            }
+            inst.push(e);
+            inst.handleTokens(qRef.tokens);
+            e = inst.popTop();
+        }
+        inst.state.stack = tempStack;
+        inst.push(res);
+    }
+    else {
+        inst.push(arr);
+        inst.push(functor);
+        throw new NoCaseException(arr, functor);
+    }
+}
 
 // helper / bootstrap
 class NoCaseException : Exception {
@@ -278,6 +347,8 @@ void initialize(Instance inst) {
     register("dup", stackNilad!duplicateTop);
     register("swap", stackNilad!swapTopTwo);
     //functions
+    register("map", stackNilad!quoteMapOnStack);
+    register("imap", stackNilad!(quoteMapOnStack!true));
     register("out", stackNilad!outputln);
     register("put", stackNilad!output);
     register("debug", stackNilad!debugStack);
@@ -286,6 +357,7 @@ void initialize(Instance inst) {
     register("opbang", stackNilad!opbang);
     register("repr", stackUnaryFun!repr);
     register("stack", stackNilad!pushStackCopy);
+    register("iota", stackUnaryFun!iotaUnary);
     //conversions
     register("to_s", stackUnaryFun!convertToString);
     // register("to_a", stackUnaryFun!convertToArray);
