@@ -185,6 +185,10 @@ Token[] parse(dstring s, dstring[dstring] ops) {
                 build.raw ~= s[i];
                 nextChar(i);
             }
+            if(i < s.length && s[i] == 'b') {
+                build.raw ~= s[i];
+                nextChar(i);
+            }
         }
         else if(s[i].isIdentifierHead) {
             build.type = TokenType.WORD;

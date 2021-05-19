@@ -106,12 +106,10 @@ bool isTruthyToBool(Atom a) {
 
 //TODO: expand
 Atom equal(Atom a, Atom b) {
-    Atom v = a == b;
-    return v;
+    return Atom(a == b);
 }
 Atom notEqual(Atom a, Atom b) {
-    Atom v = a != b;
-    return v;
+    return Atom(a != b);
 }
 
 
@@ -213,8 +211,7 @@ Atom repr(Atom e) {
 }
 
 Atom pair(Atom a, Atom b) {
-    Atom p = [ a, b ];
-    return p;
+    return Atom([a, b]);
 }
 
 void output(Instance inst) {
@@ -384,10 +381,8 @@ Atom convertToString(Atom e) {
 
 Atom[] iotaUnary(BigInt e) {
     Atom[] list;
-    // for(BigInt i = 0; i < e; i++) {
     foreach(i; BI_ZERO..e) {
-        Atom el = i;
-        list ~= el;
+        list ~= Atom(i);
     }
     return list;
 }
@@ -446,8 +441,7 @@ void gather(Instance inst) {
             // res ~= inst.popTop();
             res.insertInPlace(0, inst.popTop());
         }
-        Atom toPush = res;
-        inst.push(toPush);
+        inst.push(Atom(res));
     }
     else {
         inst.push(n);

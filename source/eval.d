@@ -12,9 +12,12 @@ import quote;
 //TODO: bigfloat
 Atom parseNumber(dstring repr) {
     // TODO: other types
-    Atom v = BigInt(repr);
-    // Variant v = to!int(repr);
-    return v;
+    if(repr[$ - 1] == 'b') {
+        return Atom(repr[0..$-1] != "0"d);
+    }
+    else {
+        return Atom(BigInt(repr));
+    }
 }
 
 Atom parseString(dstring repr) {
