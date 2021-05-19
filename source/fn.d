@@ -373,6 +373,19 @@ dstring convertToString(Quote e) { return e.tokens.map!"a.raw".join(""); }
 Atom convertToString(Atom e) {
     return visitOverload!"convertToString"(e);
 }
+
+Atom[Atom] convertToAssociativeArray(Atom[] arr) {
+    Atom[Atom] res;
+    foreach(k; arr) {
+        Atom key = elementAccess(k, Atom(BI_ZERO));
+        Atom value = elementAccess(k, Atom(BI_ONE));
+        res[key] = value;
+    }
+    return res;
+}
+Atom convertToAssociativeArray(Atom e) {
+    return visitOverload!"convertToAssociativeArray"(e);
+}
 // Atom convertToArray(Atom e) {
     // return visitOverload!convertToArray(e);
 // }
@@ -545,6 +558,8 @@ void initialize(Instance inst) {
     register("size", stackUnaryFun!sizeOfTop);
     //conversions
     register("to_s", stackUnaryFun!convertToString);
+    register("to_h", stackUnaryFun!convertToAssociativeArray);
+    register("H", stackUnaryFun!convertToAssociativeArray);
     // register("to_a", stackUnaryFun!convertToArray);
     // register("to_n", stackUnaryFun!convertToNumber);
     //misc info
