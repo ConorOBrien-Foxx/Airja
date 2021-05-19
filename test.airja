@@ -1,1 +1,1 @@
-5 [ stack size 10 ≠ ] [ : ] while debug
+"Hello, World!" 2 get out

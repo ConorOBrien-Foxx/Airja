@@ -231,22 +231,56 @@ void debugStack(Instance inst) {
 }
 
 
-void whileLoop(Instance inst) {
-    auto functor = inst.popTop();
+void whileLoop(alias check = true)(Instance inst) {
+    auto bodyFunction = inst.popTop();
     auto condition = inst.popTop();
-    if(functor.isCallable && condition.isCallable) {
+    if(bodyFunction.isCallable && condition.isCallable) {
         while(true) {
             inst.call(condition);
             auto top = inst.popTop();
-            if(!isTruthyToBool(top)) break;
-            inst.call(functor);
+            if(isTruthyToBool(top) != check) break;
+            inst.call(bodyFunction);
         }
     }
     else {
         inst.push(condition);
-        inst.push(functor);
-        throw new NoCaseException(condition, functor);
+        inst.push(bodyFunction);
+        throw new NoCaseException(condition, bodyFunction);
     }
+}
+void ifConditionSingle(alias check = true)(Instance inst) {
+    auto bodyFunction = inst.popTop();
+    auto condition = inst.popTop();
+    if(bodyFunction.isCallable) {
+        if(isTruthyToBool(condition) == check) {
+            inst.call(bodyFunction);
+        }
+    }
+    else {
+        inst.push(condition);
+        inst.push(bodyFunction);
+        throw new NoCaseException(condition, bodyFunction);
+    }
+}
+void ifElseCondition(Instance inst) {
+    auto bodyFunction = inst.popTop();
+    auto elseFunction = inst.popTop();
+    auto condition = inst.popTop();
+    if(bodyFunction.isCallable && elseFunction.isCallable) {
+        if(isTruthyToBool(condition)) {
+            inst.call(bodyFunction);
+        }
+        else {
+            inst.call(elseFunction);
+        }
+    }
+    else {
+        inst.push(condition);
+        inst.push(elseFunction);
+        inst.push(bodyFunction);
+        throw new NoCaseException(condition, elseFunction, bodyFunction);
+    }
+
 }
 
 void callTopAsFunction(Instance inst) {
@@ -262,23 +296,23 @@ void callTopAsFunction(Instance inst) {
 }
 
 void callTopAsFunctionOnArray(Instance inst) {
-    auto functor = inst.popTop();
-    // Quote* qRef = functor.peek!Quote;
+    auto bodyFunction = inst.popTop();
+    // Quote* qRef = bodyFunction.peek!Quote;
     auto arr = inst.popTop();
     Atom[]* src = arr.peek!(Atom[]);
-    if(functor.isCallable && src !is null) {
+    if(bodyFunction.isCallable && src !is null) {
         Atom[] res = (*src).dup;
         auto tempStack = inst.state.stack;
         inst.state.stack = new Stack(res);
-        inst.call(functor);
+        inst.call(bodyFunction);
         Atom[] saveData = inst.state.stack.data;
         inst.state.stack = tempStack;
         inst.push(saveData);
     }
     else {
         inst.push(arr);
-        inst.push(functor);
-        throw new NoCaseException(arr, functor);
+        inst.push(bodyFunction);
+        throw new NoCaseException(arr, bodyFunction);
     }
 }
 
@@ -324,6 +358,16 @@ void pushStackCopy(Instance inst) {
     inst.push(inst.state.stack.data.dup);
 }
 
+Atom elementAccess(dstring str, BigInt index) {
+    return Atom(to!dstring(str[cast(uint) index]));
+}
+Atom elementAccess(Atom[] arr, BigInt index) {
+    return arr[cast(uint) index];
+}
+Atom elementAccess(Atom a, Atom b) {
+    return visitOverload!"elementAccess"(a, b);
+}
+
 dstring convertToString(dstring e) { return e; }
 dstring convertToString(BigInt e) { return to!dstring(e); }
 dstring convertToString(Atom[] e) { return e.map!(p => to!dstring(convertToString(p))).join(""); }
@@ -361,11 +405,11 @@ Atom sizeOfTop(Atom e) {
 }
 
 void quoteMapOnStack(alias withIndex = false)(Instance inst) {
-    auto functor = inst.popTop();
-    // Quote* qRef = functor.peek!Quote;
+    auto bodyFunction = inst.popTop();
+    // Quote* qRef = bodyFunction.peek!Quote;
     auto arr = inst.popTop();
     Atom[]* src = arr.peek!(Atom[]);
-    if(functor.isCallable && src !is null) {
+    if(bodyFunction.isCallable && src !is null) {
         Atom[] res = (*src).dup;
         auto tempStack = inst.state.stack;
         foreach(i, ref e; res) {
@@ -375,7 +419,7 @@ void quoteMapOnStack(alias withIndex = false)(Instance inst) {
             }
             inst.push(e);
             // inst.handleTokens(qRef.tokens);
-            inst.call(functor);
+            inst.call(bodyFunction);
             e = inst.popTop();
         }
         inst.state.stack = tempStack;
@@ -383,8 +427,8 @@ void quoteMapOnStack(alias withIndex = false)(Instance inst) {
     }
     else {
         inst.push(arr);
-        inst.push(functor);
-        throw new NoCaseException(arr, functor);
+        inst.push(bodyFunction);
+        throw new NoCaseException(arr, bodyFunction);
     }
 }
 
@@ -482,8 +526,14 @@ void initialize(Instance inst) {
     register("drop", stackNilad!stackPop);
     register("eq", stackBinaryFun!equal);
     register("neq", stackBinaryFun!notEqual);
-    //functions
+    //control
     register("while", stackNilad!whileLoop);
+    register("until", stackNilad!(whileLoop!false));
+    register("when", stackNilad!ifConditionSingle);
+    register("unless", stackNilad!(ifConditionSingle!false));
+    register("if", stackNilad!ifElseCondition);
+    //functions
+    register("get", stackBinaryFun!elementAccess);
     register("map", stackNilad!quoteMapOnStack);
     register("imap", stackNilad!(quoteMapOnStack!true));
     register("out", stackNilad!outputln);
