@@ -14,6 +14,8 @@ enum TokenType {
     SET_FUNCTION,       // @:name
     VALUEOF,            // $name
     COMMENT,            // ;asdf\n
+    ARRAY_START,        // {
+    ARRAY_END,          // }
     NUMBER,
     OP,
     WORD,
@@ -231,6 +233,16 @@ Token[] parse(dstring s, dstring[dstring] ops) {
         }
         else if(s[i] == ']') {
             build.type = TokenType.QUOTE_END;
+            build.raw ~= s[i];
+            nextChar(i);
+        }
+        else if(s[i] == '(') {
+            build.type = TokenType.ARRAY_START;
+            build.raw ~= s[i];
+            nextChar(i);
+        }
+        else if(s[i] == ')') {
+            build.type = TokenType.ARRAY_END;
             build.raw ~= s[i];
             nextChar(i);
         }

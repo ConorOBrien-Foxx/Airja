@@ -74,11 +74,6 @@ auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
     return res;
 }
 
-// Atom boolToAtom(bool b) {
-    // Atom res = b ? BigInt("1") : BigInt("0");
-    // return res;
-// }
-
 Atom isTruthy(BigInt i) {
     return Atom(i != 0);
 }
@@ -198,8 +193,14 @@ dstring repr(NilClass nil) {
 dstring repr(Quote q) {
     return "[" ~ q.tokens.map!"a.raw".join ~ "]";
 }
+dstring repr(StackCallable sc) {
+    return "[internal function]"d;
+}
 dstring repr(TaggedStackCallable tsc) {
     return tsc.toString();
+}
+dstring repr(Atom[Atom] aa) {
+    return to!dstring(aa);
 }
 //TODO: expand booleans
 dstring repr(bool b) {

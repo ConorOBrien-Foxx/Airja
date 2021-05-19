@@ -81,8 +81,7 @@ class Stack {
     //TODO: specify?
     void push(T)(T e)
     if(!is(Atom == T)) {
-        Atom q = e;
-        push(q);
+        push(Atom(e));
     }
     
     Atom pop() {

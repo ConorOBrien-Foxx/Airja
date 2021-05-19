@@ -72,16 +72,7 @@ class Instance {
     }
     void closeScope(bool append = false) {
         if(append) {
-            // writeln("Before:");
-            // writeln(states[$-2].stack.data);
-            // foreach(i, st; states) {
-                // writefln("%u: %s", i, st.stack.data);
-            // }
             states[$ - 2].stack ~= state.stack;
-            // writeln("After:");
-            // foreach(i, st; states) {
-                // writefln("%u: %s", i, st.stack.data);
-            // }
         }
         else {
             states[$ - 2].stack = state.stack;
@@ -208,6 +199,22 @@ class Instance {
                 else {
                     buildQuote ~= tok;
                 }
+                break;
+            
+            case TokenType.ARRAY_START:
+                openScope();
+                state.stack.clear;
+                break;
+            
+            case TokenType.ARRAY_END:
+                //TODO: bound check
+                foreach(k, v; state.vars) {
+                    states[$ - 2].vars[k] = v;
+                }
+                auto temp = state.stack.data.dup;
+                state.stack.clear;
+                closeScope(true);
+                push(temp);
                 break;
             
             case TokenType.WORD:
