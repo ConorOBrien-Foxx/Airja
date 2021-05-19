@@ -13,6 +13,9 @@ import state;
 import eval;
 import quote;
 
+static BI_ZERO = BigInt("0");
+static BI_ONE = BigInt("1");
+
 auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
     import std.range : iota;
     import std.conv : text;
@@ -76,6 +79,32 @@ auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
     // return res;
 // }
 
+Atom isTruthy(BigInt i) {
+    return Atom(i != 0);
+}
+Atom isTruthy(bool b) {
+    return Atom(b);
+}
+Atom isTruthy(NilClass n) {
+    return Atom(false);
+}
+Atom isTruthy(dstring d) {
+    return Atom(d.length != 0);
+}
+Atom isTruthy(Atom[] arr) {
+    return Atom(arr.length != 0);
+}
+Atom isTruthy(Atom a) {
+    return visitOverload!"isTruthy"(a);
+}
+bool isTruthyToBool(Atom a) {
+    if(!a.convertsTo!bool) {
+        a = isTruthy(a);
+    }
+    return *a.peek!bool;
+}
+
+//TODO: expand
 Atom equal(Atom a, Atom b) {
     Atom v = a == b;
     return v;
@@ -123,7 +152,10 @@ BigInt mul(BigInt a, BigInt b) {
 dstring mul(dstring a, BigInt b) {
     import std.range : repeat;
     dstring res;
-    for(BigInt i = 0; i < b; i++) {
+    // for(BigInt i = 0; i < b; i++) {
+        // res ~= a;
+    // }
+    foreach(i; BI_ZERO..b) {
         res ~= a;
     }
     return res;
@@ -171,6 +203,7 @@ dstring repr(Quote q) {
 dstring repr(TaggedStackCallable tsc) {
     return tsc.toString();
 }
+//TODO: expand booleans
 dstring repr(bool b) {
     return b ? "1b" : "0b";
 }
@@ -196,6 +229,26 @@ void outputln(Instance inst) {
 void debugStack(Instance inst) {
     writefln("Stack: %s", repr(inst.state.stack.data));
 }
+
+
+void whileLoop(Instance inst) {
+    auto functor = inst.popTop();
+    auto condition = inst.popTop();
+    if(functor.isCallable && condition.isCallable) {
+        while(true) {
+            inst.call(condition);
+            auto top = inst.popTop();
+            if(!isTruthyToBool(top)) break;
+            inst.call(functor);
+        }
+    }
+    else {
+        inst.push(condition);
+        inst.push(functor);
+        throw new NoCaseException(condition, functor);
+    }
+}
+
 void callTopAsFunction(Instance inst) {
     auto top = inst.popTop();
     Quote* qRef = top.peek!Quote;
@@ -208,13 +261,34 @@ void callTopAsFunction(Instance inst) {
     }
 }
 
+void callTopAsFunctionOnArray(Instance inst) {
+    auto functor = inst.popTop();
+    // Quote* qRef = functor.peek!Quote;
+    auto arr = inst.popTop();
+    Atom[]* src = arr.peek!(Atom[]);
+    if(functor.isCallable && src !is null) {
+        Atom[] res = (*src).dup;
+        auto tempStack = inst.state.stack;
+        inst.state.stack = new Stack(res);
+        inst.call(functor);
+        Atom[] saveData = inst.state.stack.data;
+        inst.state.stack = tempStack;
+        inst.push(saveData);
+    }
+    else {
+        inst.push(arr);
+        inst.push(functor);
+        throw new NoCaseException(arr, functor);
+    }
+}
+
 void callTopAsFunctionNTimes(Instance inst) {
     auto count = inst.popTop();
     BigInt* biRef = count.peek!BigInt;
     auto top = inst.popTop();
     Quote* qRef = top.peek!Quote;
     if(biRef !is null && qRef !is null) {
-        for(int i = 0; i < *biRef; i++) {
+        foreach(i; BI_ZERO..*biRef) {
             inst.call(*qRef);
         }
     }
@@ -266,7 +340,8 @@ Atom convertToString(Atom e) {
 
 Atom[] iotaUnary(BigInt e) {
     Atom[] list;
-    for(BigInt i = 0; i < e; i++) {
+    // for(BigInt i = 0; i < e; i++) {
+    foreach(i; BI_ZERO..e) {
         Atom el = i;
         list ~= el;
     }
@@ -275,6 +350,14 @@ Atom[] iotaUnary(BigInt e) {
 
 Atom iotaUnary(Atom e) {
     return visitOverload!"iotaUnary"(e);
+}
+
+BigInt sizeOfTop(Atom[] arr) {
+    BigInt k = arr.length;
+    return k;
+}
+Atom sizeOfTop(Atom e) {
+    return visitOverload!"sizeOfTop"(e);
 }
 
 void quoteMapOnStack(alias withIndex = false)(Instance inst) {
@@ -307,6 +390,25 @@ void quoteMapOnStack(alias withIndex = false)(Instance inst) {
 
 void stackPop(Instance inst) {
     inst.popTop();
+}
+
+void gather(Instance inst) {
+    import std.array : insertInPlace;
+    auto n = inst.popTop();
+    BigInt* nVal = n.peek!BigInt;
+    if(nVal !is null) {
+        Atom[] res;
+        foreach(i; BI_ZERO..*nVal) {
+            // res ~= inst.popTop();
+            res.insertInPlace(0, inst.popTop());
+        }
+        Atom toPush = res;
+        inst.push(toPush);
+    }
+    else {
+        inst.push(n);
+        throw new NoCaseException(n);
+    }
 }
 
 // helper / bootstrap
@@ -381,6 +483,7 @@ void initialize(Instance inst) {
     register("eq", stackBinaryFun!equal);
     register("neq", stackBinaryFun!notEqual);
     //functions
+    register("while", stackNilad!whileLoop);
     register("map", stackNilad!quoteMapOnStack);
     register("imap", stackNilad!(quoteMapOnStack!true));
     register("out", stackNilad!outputln);
@@ -388,10 +491,13 @@ void initialize(Instance inst) {
     register("debug", stackNilad!debugStack);
     register("call", stackNilad!callTopAsFunction);
     register("ncall", stackNilad!callTopAsFunctionNTimes);
+    register("scall", stackNilad!callTopAsFunctionOnArray);
     register("bang", stackNilad!opbang);
     register("repr", stackUnaryFun!repr);
     register("stack", stackNilad!pushStackCopy);
     register("iota", stackUnaryFun!iotaUnary);
+    register("gather", stackNilad!gather);
+    register("size", stackUnaryFun!sizeOfTop);
     //conversions
     register("to_s", stackUnaryFun!convertToString);
     // register("to_a", stackUnaryFun!convertToArray);
