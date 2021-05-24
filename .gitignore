@@ -13,3 +13,6 @@ airja-test-*
 *.o
 *.obj
 *.lst
+
+
+airja.test
