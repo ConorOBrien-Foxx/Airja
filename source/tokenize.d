@@ -125,6 +125,7 @@ shared static this() {
     registerOp("-",  "sub");
     registerOp("*",  "mul");
     registerOp("/",  "div");
+    registerOp("%",  "mod");
     registerOp("!",  "bang");
     registerOp(",",  "pair");
     registerOp(":",  "dup");
@@ -132,6 +133,7 @@ shared static this() {
     registerOp("~",  "drop");
     registerOp("=",  "eq");
     registerOp("≠",  "neq");
+    registerOp("!=", "neq");
     registerOp("<",  "lt");
     registerOp("<=", "lte");
     registerOp(">",  "gt");

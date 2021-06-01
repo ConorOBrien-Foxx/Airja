@@ -1,1 +1,8 @@
 [ : * ] @:square
+[ : : * * ] @:cube
+[ : + ] @:double
+[ 2 / ] @:halve
+; TODO: floor/negative
+[ n b | ( n [ : 0 > ] [ : b % \ b / ] while ~ ) rev ] @:bdig
+[ 10 bdig ] @:digits
+[ 2 bdig ] @:bin

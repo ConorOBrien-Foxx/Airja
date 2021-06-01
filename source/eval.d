@@ -73,7 +73,10 @@ class Instance {
         states ~= new State(inheritedMemory.dup);
     }
     
+    bool[string] libsIncluded;
     void requireLibrary(string name) {
+        if(name in libsIncluded && libsIncluded[name]) return;
+        libsIncluded[name] = true;
         import std.file : readText;
         auto libName = buildPath(BASE_PATH, "lib", name);
         auto libNameTokens = libName ~ ".aout";

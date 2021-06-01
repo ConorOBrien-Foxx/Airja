@@ -7,6 +7,7 @@ import std.traits : Parameters, ReturnType;
 import std.algorithm : map;
 import std.array : join;
 import std.meta : Alias;
+import std.range;
 
 // import state : Stack, Atom, Nil, NilNoCase, NilNoReturn, NilClass;
 import state;
@@ -17,7 +18,7 @@ static BI_ZERO = BigInt("0");
 static BI_ONE = BigInt("1");
 
 auto visitOverload(alias Fn, VariantType...)(VariantType variants) {
-    import std.range : iota;
+    // import std.range : iota;
     import std.conv : text;
     static assert(VariantType.length > 0);
     
@@ -178,6 +179,13 @@ Atom sub(Atom a, Atom b) {
     return visitOverload!"sub"(a, b);
 }
 
+BigInt mod(BigInt a, BigInt b) {
+    return a % b;
+}
+Atom mod(Atom a, Atom b) {
+    return visitOverload!"mod"(a, b);
+}
+
 BigInt mul(BigInt a, BigInt b) {
     return a * b;
 }
@@ -255,6 +263,16 @@ Atom repr(Atom e) {
 
 Atom pair(Atom a, Atom b) {
     return Atom([a, b]);
+}
+
+dstring reverseAtom(dstring s) {
+    return s.retro.array;
+}
+Atom[] reverseAtom(Atom[] a) {
+    return a.retro.array;
+}
+Atom reverseAtom(Atom a) {
+    return visitOverload!"reverseAtom"(a);
 }
 
 void output(Instance inst) {
@@ -581,6 +599,7 @@ void initialize(Instance inst) {
     register("add", stackBinaryFun!add);
     register("sub", stackBinaryFun!sub);
     register("mul", stackBinaryFun!mul);
+    register("mod", stackBinaryFun!mod);
     register("div", stackBinaryFun!div);
     register("pair", stackBinaryFun!pair);
     register("dup", stackNilad!duplicateTop);
@@ -602,6 +621,7 @@ void initialize(Instance inst) {
     register("if", stackNilad!ifElseCondition);
     register("needs", stackNilad!needs);
     //functions
+    register("rev", stackUnaryFun!reverseAtom);
     register("get", stackBinaryFun!elementAccess);
     register("map", stackNilad!quoteMapOnStack);
     register("imap", stackNilad!(quoteMapOnStack!true));
