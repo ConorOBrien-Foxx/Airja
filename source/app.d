@@ -1,31 +1,48 @@
 import std.stdio;
 import std.file;// : readText;
 import std.getopt;
-// import std.utf;
+import std.path : stripExtension;
 
-// import tokenize;
-// import state;
-
-
-
+import tokenize;
 import eval;
 
+// import std.utf;
+
+// import state;
+
 void main(string[] args) {
-    string filename = "test.airja";
+    string filename;
+    bool tokFile;
+    
     auto info = getopt(args,
-        "file", &filename
+        std.getopt.config.bundling,
+        "f|file", &filename,
+        "t|tokenizeOut", &tokFile
     );
-    // string filename = args.length < 2 ? "test.airja" : args[1];
+    
+    if(filename == "" && args.length > 1) {
+        filename = args[1];
+    }
+    
+    if (info.helpWanted || filename == "") {
+        defaultGetoptPrinter(
+            "Some information about the program.",
+            info.options
+        );
+        return;
+    }
+    
     string content = readText(filename);
+    
+    if(tokFile) {
+        Token[] tokens = parse(content);
+        if(tokens == null) {
+            writeln("Unspecified error during parsing");
+            return;
+        }
+        string outpath = stripExtension(filename) ~ ".aout";
+        Token.writeTokenArrayToFile(tokens, outpath);
+        return;
+    }
     eval.execute(content);
-    // Token[] tokens = tokenize.parse(content);
-    // if(tokens == null) {
-        // writeln("Unspecified error during parsing");
-        // return;
-    // }
-    // foreach(i, token; tokens) {
-        // if(token.type == TokenType.WHITESPACE) write("\x1b[30;1m");
-        // writefln("%-4u %s", i, token);
-        // write("\x1b[0m");
-    // }
 }

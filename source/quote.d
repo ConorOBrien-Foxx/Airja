@@ -8,15 +8,26 @@ class Quote {
     Token[] tokens;
     Token[] args;
     State context;//TODO: bind context for closures
-    bool clearStack = false;
+    bool hasQuoteSep;
     
-    this(Token[] args, Token[] tokens) {
+    this(Token[] args, Token[] tokens, bool hasQuoteSep = false) {
         this.tokens = tokens;
         this.args = args;
-        if(this.tokens[0].payload) {
+        // if(this.tokens[0].payload) {
             //TODO: make saner
-            clearStack = true;
-        }
+            // clearStack = true;
+        // }
+        hasQuoteSep = hasQuoteSep;
+    }
+    
+    static Quote join(Quote a, Quote b) {
+        import std.stdio;
+        assert(!a.hasQuoteSep && !b.hasQuoteSep);
+        Token space = { row: 0, col: 0, raw: " ", type: TokenType.WHITESPACE };
+        Quote res = new Quote([], a.tokens.dup);
+        res.tokens ~= space;
+        res.tokens ~= b.tokens;
+        return res;
     }
     
     override string toString() {

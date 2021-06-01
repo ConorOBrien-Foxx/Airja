@@ -3,7 +3,9 @@ import std.ascii : isDigit;
 import std.string : strip;
 import std.functional : binaryFun;
 import std.algorithm.searching : find;
-import std.array : insertInPlace;
+import std.array : insertInPlace, replace;
+import std.conv : to, text;
+import std.json;
 
 enum TokenType {
     QUOTE_START,        // [
@@ -27,6 +29,24 @@ enum TokenType {
 bool isQuoteDelimiter(TokenType t) {
     return t == TokenType.QUOTE_START || t == TokenType.QUOTE_END;
 }
+
+uint getUint(JSONValue jv) {
+    import std.stdio : writeln;
+    uint v;
+    switch(jv.type) {
+        case JSONType.integer:
+            v = jv.integer.to!uint;
+            break;
+        case JSONType.string:
+            v = jv.str.to!uint;
+            break;
+        default:
+            writeln("Unexpected JSONType: ", jv.type);
+            break;
+    }
+    return v;
+}
+
 struct Token {
     TokenType type;
     dstring raw;
@@ -34,10 +54,60 @@ struct Token {
     uint col;
     dstring payload;
     
+    JSONValue toJson() {
+        return JSONValue([
+            "type": JSONValue(to!string(type)),
+            "raw": JSONValue(raw),
+            "row": JSONValue(row),
+            "col": JSONValue(col),
+            "payload": JSONValue(payload),
+        ]);
+    }
+    
+    deprecated string toReversibleString() {
+        return toJson.toString;
+    }
+    
     static Token none() {
         return Token(TokenType.NONE,"",0,0,"");
     }
+    
+    static Token fromJSON(JSONValue jv) {
+        return Token(
+            jv["type"].str.to!TokenType,
+            jv["raw"].str.to!dstring,
+            jv["row"].getUint,
+            jv["col"].getUint,
+            jv["payload"].str.to!dstring,
+        );
+    }
+    
+    static Token[] JSONToTokenArray(string json) {
+        JSONValue values = json.parseJSON;
+        Token[] res;
+        foreach(JSONValue v; values.array) {
+            res ~= Token.fromJSON(v);
+        }
+        return res;
+    }
+    
+    static Token[] fileToTokenArray(string path) {
+        import std.file : readText;
+        return JSONToTokenArray(path.readText);
+    }
+    
+    static JSONValue tokenArrayToJson(Token[] tokens) {
+        import std.algorithm : map;
+        import std.array : array;
+        return JSONValue(tokens.map!"a.toJson".array);
+    }
+    
+    static void writeTokenArrayToFile(Token[] tokens, string path) {
+        import std.file : write;
+        write(path, Token.tokenArrayToJson(tokens).toString());
+    }
 }
+
 bool isQuoteDelimiter(Token tok) {
     return tok.type.isQuoteDelimiter;
 }
@@ -62,6 +132,10 @@ shared static this() {
     registerOp("~",  "drop");
     registerOp("=",  "eq");
     registerOp("≠",  "neq");
+    registerOp("<",  "lt");
+    registerOp("<=", "lte");
+    registerOp(">",  "gt");
+    registerOp(">=", "gte");
 }
 
 void insertSorted(alias less = "a < b", Range, Cell)(ref Range src, Cell toInsert) {

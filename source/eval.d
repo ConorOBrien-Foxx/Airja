@@ -9,11 +9,21 @@ import state;
 import fn;
 import quote;
 
+import std.file : thisExePath, exists;
+import std.path : dirName, buildPath;
+// import std.conv : to;
+
+string BASE_PATH;
+
+shared static this() {
+    BASE_PATH = thisExePath.dirName;
+}
+
 //TODO: bigfloat
 Atom parseNumber(dstring repr) {
     // TODO: other types
     if(repr[$ - 1] == 'b') {
-        return Atom(repr[0..$-1] != "0"d);
+        return Atom(!!BigInt(repr[0..$-1]));
     }
     else {
         return Atom(BigInt(repr));
@@ -61,6 +71,28 @@ class Instance {
     this(Token[] tokens) {
         this.tokens = tokens;
         states ~= new State(inheritedMemory.dup);
+    }
+    
+    void requireLibrary(string name) {
+        import std.file : readText;
+        auto libName = buildPath(BASE_PATH, "lib", name);
+        auto libNameTokens = libName ~ ".aout";
+        Token[] tokens;
+        if(libNameTokens.exists) {
+            tokens = Token.fileToTokenArray(libNameTokens);
+        }
+        else {
+            auto libNameRaw = libName ~ ".airja";
+            if(!libNameRaw.exists) {
+                writeln("No such library: <", name, ">");
+                return;
+            }
+            tokens = libNameRaw.readText.parse;
+        }
+        handleTokens(tokens);
+    }
+    void requireLibrary(dstring name) {
+        requireLibrary(name.to!string);
     }
     
     State state() {
@@ -124,11 +156,11 @@ class Instance {
                 setLocalVar(name, value);
             }
         }
-        
+        // writeln(q.tokens);
         handleTokens(q.tokens);
         
         if(q.args.length) {
-            closeScope(q.clearStack);
+            closeScope(q.hasQuoteSep);
         }
     }
     
@@ -160,6 +192,7 @@ class Instance {
         if(quoteDepth > 0 && !tok.isQuoteDelimiter) {
             if(tok.type == TokenType.QUOTE_SEP && !hasQuoteSep) {
                 quoteSepIndex = buildQuote.length;
+                hasQuoteSep = true;
             }
             buildQuote ~= tok;
             return;
@@ -193,7 +226,8 @@ class Instance {
                 if(quoteDepth == 0) {
                     state.stack.push(new Quote(
                         buildQuote[0..quoteSepIndex],
-                        buildQuote[quoteSepIndex..$]
+                        buildQuote[quoteSepIndex..$],
+                        hasQuoteSep
                     ));
                 }
                 else {
@@ -304,6 +338,7 @@ shared static this() {
 void execute(string s) {
     Token[] tokens = tokenize.parse(s);
     auto instance = new Instance(tokens);
+    instance.requireLibrary("std");
     instance.run;
     // writeln(instance.state.stack.data);
 }

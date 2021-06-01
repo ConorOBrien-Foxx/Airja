@@ -106,7 +106,25 @@ Atom equal(Atom a, Atom b) {
 Atom notEqual(Atom a, Atom b) {
     return Atom(a != b);
 }
+Atom logicAnd(Atom a, Atom b) {
+    return Atom(isTruthyToBool(a) && isTruthyToBool(b));
+}
+Atom logicOr(Atom a, Atom b) {
+    return Atom(isTruthyToBool(a) || isTruthyToBool(b));
+}
 
+Atom lessThan(Atom a, Atom b) {
+    return Atom(a < b);
+}
+Atom lessThanOrEqualTo(Atom a, Atom b) {
+    return logicOr(lessThan(a, b), equal(a, b));
+}
+Atom greaterThan(Atom a, Atom b) {
+    return Atom(a > b);
+}
+Atom greaterThanOrEqualTo(Atom a, Atom b) {
+    return logicOr(greaterThan(a, b), equal(a, b));
+}
 
 BigInt add(BigInt a, BigInt b) {
     return a + b;
@@ -114,9 +132,10 @@ BigInt add(BigInt a, BigInt b) {
 dstring add(dstring a, dstring b) {
     return a ~ b;
 }
-// Quote add(Quote a, Quote b) {
-    // return new Quote(a.tokens ~ b.tokens);
-// }
+// TODO: figure out how to work with arguments
+bool add(bool a, bool b) {
+    return a || b;
+}
 Atom[] add(Atom[] a, Atom[] b) {
     return a ~ b;
 }
@@ -127,8 +146,28 @@ Atom[] add(Atom[] a, Atom[] b) {
     // return a ~ b;
 // }
 
-
 Atom add(Atom a, Atom b) {
+    Atom[]* aArr = a.peek!(Atom[]);
+    Atom[]* bArr = b.peek!(Atom[]);
+    if(aArr !is null && bArr !is null) {
+        return Atom(*aArr ~ *bArr);
+    }
+    if(aArr !is null) {
+        return Atom(*aArr ~ b);
+    }
+    if(bArr !is null) {
+        return Atom([] ~ a ~ *bArr);
+    }
+    
+    Quote* aQuote = a.peek!Quote;
+    Quote* bQuote = b.peek!Quote;
+    if(aQuote !is null && bQuote !is null) {
+        if(aQuote.hasQuoteSep || bQuote.hasQuoteSep) {
+            return Atom(NilNoCase);
+        }
+        return Atom(Quote.join(*aQuote, *bQuote));
+    }
+    
     return visitOverload!"add"(a, b);
 }
 
@@ -155,6 +194,9 @@ dstring mul(dstring a, BigInt b) {
 }
 dstring mul(BigInt b, dstring a) {
     return mul(a, b);
+}
+bool mul(bool a, bool b) {
+    return a && b;
 }
 Atom mul(Atom a, Atom b) {
     return visitOverload!"mul"(a, b);
@@ -463,6 +505,18 @@ void gather(Instance inst) {
     }
 }
 
+void needs(Instance inst) {
+    auto top = inst.popTop();
+    dstring* val = top.peek!dstring;
+    if(val !is null) {
+        inst.requireLibrary(*val);
+    }
+    else {
+        inst.push(top);
+        throw new NoCaseException();
+    }
+}
+
 // helper / bootstrap
 class NoCaseException : Exception {
     Atom[] args;
@@ -534,12 +588,19 @@ void initialize(Instance inst) {
     register("drop", stackNilad!stackPop);
     register("eq", stackBinaryFun!equal);
     register("neq", stackBinaryFun!notEqual);
+    register("lt", stackBinaryFun!lessThan);
+    register("lte", stackBinaryFun!lessThanOrEqualTo);
+    register("gt", stackBinaryFun!greaterThan);
+    register("gte", stackBinaryFun!greaterThanOrEqualTo);
+    register("or", stackBinaryFun!greaterThanOrEqualTo);
+    register("and", stackBinaryFun!greaterThanOrEqualTo);
     //control
     register("while", stackNilad!whileLoop);
     register("until", stackNilad!(whileLoop!false));
     register("when", stackNilad!ifConditionSingle);
     register("unless", stackNilad!(ifConditionSingle!false));
     register("if", stackNilad!ifElseCondition);
+    register("needs", stackNilad!needs);
     //functions
     register("get", stackBinaryFun!elementAccess);
     register("map", stackNilad!quoteMapOnStack);
