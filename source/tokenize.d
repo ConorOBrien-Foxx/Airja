@@ -270,15 +270,16 @@ Token[] parse(dstring s, dstring[dstring] ops) {
             build.type = TokenType.WORD;
             build.raw ~= readWord(i);
         }
-        else if(s[i] == '"') {
+        else if(s[i] == '"' || s[i] == '\'') {
             build.type = TokenType.STRING;
-            build.raw ~= '"';
+            dchar delim = s[i];
+            build.raw ~= s[i];
             nextChar(i);
             while(i < s.length) {
                 build.raw ~= s[i];
                 nextChar(i);
-                if(s[i - 1] == '"') {
-                    if(i < s.length && s[i] == '"') {
+                if(s[i - 1] == delim) {
+                    if(i < s.length && s[i] == delim) {
                         build.raw ~= s[i];
                         nextChar(i);
                     }
@@ -287,8 +288,6 @@ Token[] parse(dstring s, dstring[dstring] ops) {
                     }
                 }
             }
-            // build.raw ~= s[i];
-            // nextChar(i);
         }
         else if(s[i] == '[') {
             build.type = TokenType.QUOTE_START;
